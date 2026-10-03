@@ -342,6 +342,14 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
                 settings->setSmartGrindIp(request->arg("smartGrindIp"));
             if (request->hasArg("smartGrindMode"))
                 settings->setSmartGrindMode(request->arg("smartGrindMode").toInt());
+            if (request->hasArg("weatherActive"))
+                settings->setWeatherActive(parseBoolArg(request->arg("weatherActive")));
+            if (request->hasArg("weatherApiKey") && request->arg("weatherApiKey") != "---unchanged---")
+                settings->setWeatherApiKey(request->arg("weatherApiKey"));
+            if (request->hasArg("weatherLocation"))
+                settings->setWeatherLocation(request->arg("weatherLocation"));
+            if (request->hasArg("weatherUnits"))
+                settings->setWeatherUnits(request->arg("weatherUnits").toInt());
             if (request->hasArg("homeAssistant"))
                 settings->setHomeAssistant(parseBoolArg(request->arg("homeAssistant")));
             if (request->hasArg("haUser"))
@@ -503,6 +511,11 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
     doc["smartGrindActive"] = settings.isSmartGrindActive();
     doc["smartGrindIp"] = settings.getSmartGrindIp();
     doc["smartGrindMode"] = settings.getSmartGrindMode();
+    doc["weatherActive"] = settings.isWeatherActive();
+    // The real key never leaves the device; the browser sends the placeholder back to keep it.
+    doc["weatherApiKey"] = settings.getWeatherApiKey().isEmpty() ? "" : "---unchanged---";
+    doc["weatherLocation"] = settings.getWeatherLocation();
+    doc["weatherUnits"] = settings.getWeatherUnits();
     doc["momentaryButtons"] = settings.isMomentaryButtons();
     doc["flushDuration"] = settings.getFlushDuration();
     doc["warnWaterLevel"] = settings.getWarnWaterLevel();

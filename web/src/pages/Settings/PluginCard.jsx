@@ -270,6 +270,81 @@ export function PluginCard({
 
       <div className='bg-base-200 rounded-lg p-4'>
         <div className='flex items-center justify-between'>
+          <span className='text-xl font-medium'>Weather Plugin</span>
+          <input
+            id='weatherActive'
+            name='weatherActive'
+            value='weatherActive'
+            type='checkbox'
+            className='toggle toggle-primary'
+            checked={!!formData.weatherActive}
+            onChange={onChange('weatherActive')}
+            aria-label='Enable Weather'
+          />
+        </div>
+        {formData.weatherActive && (
+          <div className='border-base-300 mt-4 space-y-4 border-t pt-4'>
+            <p className='text-sm opacity-70'>
+              Shows the current weather from OpenWeather below the clock on the standby screen. A
+              free API key is available at openweathermap.org; new keys can take up to 2 hours to
+              activate. Enabling or disabling the plugin needs a restart.
+            </p>
+            <div className='form-control'>
+              <label htmlFor='weatherApiKey' className='mb-2 block text-sm font-medium'>
+                OpenWeather API Key
+              </label>
+              <input
+                id='weatherApiKey'
+                name='weatherApiKey'
+                type='password'
+                autoComplete='off'
+                className='input input-bordered w-full'
+                placeholder='API key'
+                value={formData.weatherApiKey === '---unchanged---' ? '' : formData.weatherApiKey}
+                onChange={onChange('weatherApiKey')}
+              />
+              {formData.weatherApiKey === '---unchanged---' && (
+                <div className='mt-1 text-xs opacity-70'>A key is saved. Leave empty to keep it.</div>
+              )}
+            </div>
+            <div className='form-control'>
+              <label htmlFor='weatherLocation' className='mb-2 block text-sm font-medium'>
+                Location
+              </label>
+              <input
+                id='weatherLocation'
+                name='weatherLocation'
+                type='text'
+                className='input input-bordered w-full'
+                placeholder='Berlin,DE or 52.52,13.40'
+                value={formData.weatherLocation}
+                onChange={onChange('weatherLocation')}
+              />
+            </div>
+            <div className='form-control'>
+              <label htmlFor='weatherUnits' className='mb-2 block text-sm font-medium'>
+                Units
+              </label>
+              <select
+                id='weatherUnits'
+                name='weatherUnits'
+                className='select select-bordered w-full'
+                onChange={onChange('weatherUnits')}
+              >
+                <option value='0' selected={formData.weatherUnits?.toString() === '0'}>
+                  Celsius
+                </option>
+                <option value='1' selected={formData.weatherUnits?.toString() === '1'}>
+                  Fahrenheit
+                </option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className='bg-base-200 rounded-lg p-4'>
+        <div className='flex items-center justify-between'>
           <span className='text-xl font-medium'>Home Assistant over MQTT (Deprecated)</span>
           <input
             id='homeAssistant'

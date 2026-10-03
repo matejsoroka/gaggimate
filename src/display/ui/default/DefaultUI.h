@@ -88,6 +88,7 @@ class DefaultUI {
     void updateBrewProcess();
     void updateMenuScreen();
     String getErrorMessage();
+    void updateWeatherLabel();
 
     void adjustDials(lv_obj_t *dials);
     void adjustTarget(lv_obj_t *obj, double percentage, double start, double range) const;
@@ -157,6 +158,13 @@ class DefaultUI {
 
     // Standby brightness control
     unsigned long standbyEnterTime = 0;
+
+    // Weather label on the standby screen (text is set from the WeatherPlugin task, drawn by the UI task)
+    std::mutex weatherMutex;
+    String weatherText;
+    lv_obj_t *weatherLabel = nullptr;
+    lv_obj_t *weatherLabelParent = nullptr;
+    int weatherThemeIdx = -1;
 
     xTaskHandle taskHandle;
     static void loopTask(void *arg);
