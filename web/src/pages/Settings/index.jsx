@@ -65,6 +65,7 @@ const CHECKBOX_KEYS = [
   'momentaryButtons',
   'delayAdjust',
   'clock24hFormat',
+  'hideInfoButton',
   'autowakeupEnabled',
   'smartGrindToggle',
 ];

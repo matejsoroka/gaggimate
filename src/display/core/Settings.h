@@ -113,6 +113,7 @@ class Settings {
     int getFlushDuration() const { return flushDuration.get(); } // seconds, 0 = as long as the button is held
     String getTimezone() const { return timezone.get(); }
     bool isClock24hFormat() const { return clock24hFormat.get(); }
+    bool isHideInfoButton() const { return hideInfoButton.get(); }
     String getSelectedProfile() const { return selectedProfile.get(); }
     String getStartupProfile() const { return startupProfile.get(); }
     const std::vector<String> &getFavoritedProfiles() const { return favoritedProfiles.get(); }
@@ -214,6 +215,7 @@ class Settings {
     void setWarnTemperature(int level);
     void setTimezone(String timezone);
     void setClockFormat(bool format_24h);
+    void setHideInfoButton(bool hide_info_button);
     void setSelectedProfile(String selected_profile);
     void setStartupProfile(String startup_profile);
     void setFavoritedProfiles(std::vector<String> favorited_profiles);
@@ -299,6 +301,7 @@ class Settings {
     Property<int> flushDuration{registry, "fl_dur", DEFAULT_FLUSH_DURATION_S};
     Property<String> timezone{registry, "tz", DEFAULT_TIMEZONE};
     Property<bool> clock24hFormat{registry, "clk_24h", true};
+    Property<bool> hideInfoButton{registry, "hide_ib", false};
     Property<String> otaChannel{registry, "oc", DEFAULT_OTA_CHANNEL};
     Property<std::vector<String>> favoritedProfiles{registry, "fp", {}};
     Property<std::vector<String>> profileOrder{registry, "po", {}}; // persisted profile ordering

@@ -85,6 +85,7 @@ class DefaultUI {
     void updateWarnings();
     void updateProfileInfo();
     void updateBoiler();
+    void updateInfoButtonVisibility();
     void updateBrewProcess();
     void updateMenuScreen();
     String getErrorMessage();

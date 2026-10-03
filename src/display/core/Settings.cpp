@@ -188,6 +188,8 @@ void Settings::setTimezone(String timezone) { this->timezone.set(timezone); }
 
 void Settings::setClockFormat(bool clock_24h_format) { clock24hFormat.set(clock_24h_format); }
 
+void Settings::setHideInfoButton(bool hide_info_button) { hideInfoButton.set(hide_info_button); }
+
 void Settings::setSelectedProfile(String selected_profile) { selectedProfile.set(selected_profile); }
 
 void Settings::setStartupProfile(String startup_profile) { startupProfile.set(startup_profile); }

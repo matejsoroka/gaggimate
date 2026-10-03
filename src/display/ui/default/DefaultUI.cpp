@@ -246,6 +246,8 @@ void DefaultUI::loop() {
         updateProfileInfo();
         updateBoiler();
         updateBrewProcess();
+        if (currentScreen == SCREEN_ID_MENU_SCREEN_NEW)
+            updateInfoButtonVisibility();
         currentWeight = FloatValue(bluetoothWeight);
         eez::flow::setGlobalVariable(FLOW_GLOBAL_VARIABLE_SCALE_WEIGHT_CURRENT, currentWeight);
 
@@ -440,6 +442,19 @@ void DefaultUI::setupState() {
                               // positionMenuIcon(objects.btn_settings_1, step * (3 + iconOffset) - rotationOffset, radius);
                           },
                           &grindAvailable);
+}
+
+// Hides the centre info (QR code) button on the main menu when the setting is on. Never hidden in access-point mode:
+// the QR code is how users join the setup Wi-Fi. Hidden LVGL objects ignore taps, so nothing else is needed.
+void DefaultUI::updateInfoButtonVisibility() {
+    if (objects.info_btn == nullptr)
+        return; // the menu screen may not exist yet
+    const bool hide = controller->getSettings().isHideInfoButton() && !apActive;
+    const bool hidden = lv_obj_has_flag(objects.info_btn, LV_OBJ_FLAG_HIDDEN);
+    if (hide && !hidden)
+        lv_obj_add_flag(objects.info_btn, LV_OBJ_FLAG_HIDDEN);
+    else if (!hide && hidden)
+        lv_obj_clear_flag(objects.info_btn, LV_OBJ_FLAG_HIDDEN);
 }
 
 void DefaultUI::handleScreenChange() {
