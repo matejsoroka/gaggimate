@@ -50,6 +50,18 @@
     "timestamp": {
       "description": "Timestamp when notes were last updated",
       "type": "integer"
+    },
+    "coach": {
+      "description": "Shot Coach result stored when the taste was entered on the display",
+      "type": "object",
+      "properties": {
+        "change": {
+          "description": "Suggested change, shotcoach::Change enum value (src/display/core/ShotCoach.h)",
+          "type": "integer"
+        },
+        "headline": { "type": "string" },
+        "reason": { "type": "string" }
+      }
     }
   },
   "required": ["id"]

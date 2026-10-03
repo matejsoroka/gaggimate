@@ -4,8 +4,11 @@
 #include <ArduinoJson.h>
 #include <LittleFS.h>
 #include <display/core/Plugin.h>
+#include <display/core/ShotCoach.h>
 #include <display/core/utils.h>
 #include <display/models/shot_log_format.h>
+
+struct Event;
 
 constexpr size_t SHOT_HISTORY_INTERVAL = 100;
 constexpr size_t MIN_FREE_SPACE_BYTES = 500 * 1024;         // 500 KB reserved free space
@@ -44,6 +47,10 @@ class ShotHistoryPlugin : public Plugin {
     bool writeEntryAtPosition(File &indexFile, size_t position, const ShotIndexEntry &entry);
     void saveNotes(const String &id, const JsonDocument &notes);
     void loadNotes(const String &id, JsonDocument &notes);
+    // Shot Coach: publish `shot:facts` once the shot is persisted, store the taste/advice from `shot:feedback`.
+    void publishShotFacts(bool aborted, uint32_t durationMs, float finalWeight);
+    void lookupPreviousShot(const char *profileId, uint8_t &taste, uint8_t &advice, float &doseIn);
+    void saveFeedback(Event const &event);
     void startRecording();
 
     uint16_t getSystemInfo(); // Helper to pack system state bits
@@ -96,6 +103,20 @@ class ShotHistoryPlugin : public Plugin {
     uint16_t maxPressureScaled = 0; // max of sample.cp (bar * 10)
     uint32_t flowSumScaled = 0;     // sum of positive sample.fl (ml/s * 100)
     uint32_t positiveFlowCount = 0;
+
+    // Shot Coach facts gathered while recording (see record()).
+    uint32_t firstDripMs = 0;      // first sample with >= 1 g on the scale, 0 = none
+    uint16_t channelingEvents = 0; // puck-flow spikes with a simultaneous pressure drop
+    uint32_t lastChannelingMs = 0;
+    uint16_t targetTempScaled = 0;              // target temperature at shot start (°C * 10)
+    float coachTargetWeight = 0.0f;             // volumetric target of the shot, 0 when time based
+    float coachProfilePressure = 0.0f;          // highest pressure target in the profile, 0 if flow only
+    String coachRoast;                          // profile roast label
+    static constexpr size_t CHANNEL_WINDOW = 5; // compare against the sample ~0.5 s earlier
+    int16_t recentPuckFlow[CHANNEL_WINDOW] = {0};
+    uint16_t recentPressure[CHANNEL_WINDOW] = {0};
+    size_t recentPos = 0;
+    size_t recentCount = 0;
 
     // Async rebuild state
     bool rebuildInProgress = false;

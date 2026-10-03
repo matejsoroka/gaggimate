@@ -4,6 +4,7 @@
 #include <atomic>
 #include <display/core/PluginManager.h>
 #include <display/core/ProfileManager.h>
+#include <display/core/ShotCoach.h>
 #include <display/core/constants.h>
 #include <display/drivers/Driver.h>
 #include <display/models/profile.h>
@@ -86,6 +87,9 @@ class DefaultUI {
     void updateProfileInfo();
     void updateBoiler();
     void updateBrewProcess();
+    void updateShotCoachPanel();
+    void onShotCoachTaste(shotcoach::Taste taste);
+    static void shotCoachButtonCb(lv_event_t *e);
     void updateMenuScreen();
     String getErrorMessage();
 
@@ -162,6 +166,23 @@ class DefaultUI {
     static void loopTask(void *arg);
     xTaskHandle profileTaskHandle;
     static void profileLoopTask(void *arg);
+
+    // Shot Coach: taste buttons + advice on the status screen after a shot (runtime LVGL objects, no EEZ changes)
+    std::mutex coachMutex;
+    shotcoach::Facts coachFacts;
+    bool coachFactsValid = false;
+    bool coachArmed = false; // between brew end and clear: facts arriving now belong to the shot on screen
+    bool coachOffer = false; // facts arrived for a real shot and the feature is on: show the taste row
+    String coachShotId;
+    shotcoach::Taste coachTaste = shotcoach::Taste::UNKNOWN;
+    shotcoach::Advice coachAdvice;
+    bool coachHasAdvice = false;
+    lv_obj_t *coachPanel = nullptr;
+    lv_obj_t *coachPanelParent = nullptr;
+    lv_obj_t *coachButtons[3] = {nullptr, nullptr, nullptr};
+    lv_obj_t *coachLabel = nullptr;
+    int coachThemeIdx = -1;
+    void computeShotCoachAdvice(); // caller holds coachMutex
 };
 
 #endif // DEFAULTUI_H

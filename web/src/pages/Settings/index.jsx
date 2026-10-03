@@ -59,6 +59,7 @@ import { faRotate } from '@fortawesome/free-solid-svg-icons/faRotate';
 
 const CHECKBOX_KEYS = [
   'homekit',
+  'shotCoachActive',
   'boilerFillActive',
   'smartGrindActive',
   'homeAssistant',

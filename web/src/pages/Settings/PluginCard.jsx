@@ -475,6 +475,31 @@ export function PluginCard({
           </div>
         </div>
       )}
+      <div className='bg-base-200 rounded-lg p-4'>
+        <div className='flex items-center justify-between'>
+          <span className='text-xl font-medium'>Shot Coach</span>
+          <input
+            id='shotCoachActive'
+            name='shotCoachActive'
+            value='shotCoachActive'
+            type='checkbox'
+            className='toggle toggle-primary'
+            checked={!!formData.shotCoachActive}
+            onChange={onChange('shotCoachActive')}
+            aria-label='Enable Shot Coach'
+          />
+        </div>
+        {formData.shotCoachActive && (
+          <div className='border-base-300 mt-4 space-y-4 border-t pt-4'>
+            <p className='text-sm opacity-70'>
+              After each shot the display asks whether it tasted sour, balanced or bitter and
+              suggests one change for the next one (grind, dose, yield, temperature or puck prep),
+              based on the shot&apos;s time, weight, pressure and flow and the roast level set on
+              the profile. The answer and the advice are saved with the shot notes. Applies on save.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

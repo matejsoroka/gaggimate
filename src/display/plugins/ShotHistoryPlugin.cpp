@@ -17,6 +17,11 @@ constexpr float FLOW_SCALE = 100.0f;
 constexpr float WEIGHT_SCALE = 10.0f;
 constexpr float RESISTANCE_SCALE = 100.0f;
 
+// Shot Coach channeling signature: puck flow up by this much while pressure falls by this much, within ~0.5 s.
+constexpr float CHANNELING_FLOW_RISE = 1.5f;     // ml/s
+constexpr float CHANNELING_PRESSURE_DROP = 0.8f; // bar
+constexpr uint32_t CHANNELING_COOLDOWN_MS = 2000;
+
 constexpr uint16_t TEMP_MAX_VALUE = 2000;    // 200.0 °C
 constexpr uint16_t PRESSURE_MAX_VALUE = 200; // 20.0 bar
 constexpr uint16_t WEIGHT_MAX_VALUE = 10000; // 1000.0 g
@@ -93,6 +98,7 @@ void ShotHistoryPlugin::setup(Controller *c, PluginManager *pm) {
            [this](Event const &event) { currentBluetoothWeight = event.getFloat("value"); });
     pm->on("boiler:currentTemperature:change", [this](Event const &event) { currentTemperature = event.getFloat("value"); });
     pm->on("pump:puck-resistance:change", [this](Event const &event) { currentPuckResistance = event.getFloat("value"); });
+    pm->on("shot:feedback", [this](Event const &event) { saveFeedback(event); });
     // Initialize rebuild state
     rebuildInProgress = false;
     // Leftover from the abandoned separate recent-shots index; aggregates now live in index.bin.
@@ -201,6 +207,27 @@ void ShotHistoryPlugin::record() {
                 flowSumScaled += sample.fl;
                 positiveFlowCount++;
             }
+
+            // Shot Coach facts: first drip and channeling (puck flow jumps while pressure collapses).
+            if (firstDripMs == 0 && btWeight >= 1.0f) {
+                firstDripMs = sample.t;
+            }
+            if (recording && firstDripMs > 0 && recentCount >= CHANNEL_WINDOW) {
+                const size_t oldest = recentPos; // slot about to be overwritten = CHANNEL_WINDOW samples ago
+                const float flowRise = (sample.pf - recentPuckFlow[oldest]) / FLOW_SCALE;
+                const float pressureDrop =
+                    (static_cast<int>(recentPressure[oldest]) - static_cast<int>(sample.cp)) / PRESSURE_SCALE;
+                if (flowRise >= CHANNELING_FLOW_RISE && pressureDrop >= CHANNELING_PRESSURE_DROP &&
+                    (lastChannelingMs == 0 || sample.t - lastChannelingMs >= CHANNELING_COOLDOWN_MS)) {
+                    channelingEvents++;
+                    lastChannelingMs = sample.t;
+                }
+            }
+            recentPuckFlow[recentPos] = sample.pf;
+            recentPressure[recentPos] = sample.cp;
+            recentPos = (recentPos + 1) % CHANNEL_WINDOW;
+            if (recentCount < CHANNEL_WINDOW)
+                recentCount++;
         }
 
         // Check for weight stabilization during extended recording
@@ -255,6 +282,7 @@ void ShotHistoryPlugin::record() {
         unsigned long duration = header.durationMs;
         if (duration <= 7500) { // Exclude failed shots and flushes
             fs->remove("/h/" + currentId + ".slog");
+            publishShotFacts(true, duration, finalWeight);
         } else {
             controller->getSettings().setHistoryIndex(controller->getSettings().getHistoryIndex() + 1);
             cleanupHistory();
@@ -292,8 +320,94 @@ void ShotHistoryPlugin::record() {
                 savedEvent.setInt("id", indexEntry.id);
                 pluginManager->trigger(savedEvent);
             }
+            publishShotFacts(finalExitReason == static_cast<uint8_t>(PhaseExitReason::ABORTED), duration, finalWeight);
         }
     }
+}
+
+// Everything the Shot Coach rules need, published once per shot after the history entry is written so the
+// final weight is settled. Every key is always present so DefaultUI never reads Event defaults by accident.
+void ShotHistoryPlugin::publishShotFacts(bool aborted, uint32_t durationMs, float finalWeight) {
+    if (pluginManager == nullptr)
+        return;
+    uint8_t prevTaste = 0, prevAdvice = 0;
+    float doseIn = 0.0f;
+    lookupPreviousShot(header.profileId, prevTaste, prevAdvice, doseIn);
+    if (doseIn <= 0.0f && controller != nullptr)
+        doseIn = static_cast<float>(controller->getSettings().getTargetGrindVolume());
+
+    Event facts;
+    facts.id = "shot:facts";
+    facts.setString("id", currentId);
+    facts.setInt("aborted", aborted ? 1 : 0);
+    facts.setInt("durationMs", static_cast<int>(durationMs));
+    facts.setInt("firstDripMs", static_cast<int>(firstDripMs));
+    facts.setFloat("finalWeight", finalWeight > 0.0f ? finalWeight : 0.0f);
+    facts.setFloat("targetWeight", coachTargetWeight);
+    facts.setFloat("doseIn", doseIn);
+    facts.setFloat("maxPressure", maxPressureScaled / PRESSURE_SCALE);
+    facts.setFloat("avgFlow",
+                   positiveFlowCount > 0 ? (flowSumScaled / static_cast<float>(positiveFlowCount)) / FLOW_SCALE : 0.0f);
+    facts.setFloat("avgTemp", tempSampleCount > 0 ? (tempSumScaled / static_cast<float>(tempSampleCount)) / TEMP_SCALE : 0.0f);
+    facts.setFloat("targetTemp", targetTempScaled / TEMP_SCALE);
+    facts.setInt("channelingEvents", channelingEvents);
+    facts.setInt("hitTimeCap",
+                 shotStartedVolumetric && finalExitReason == static_cast<uint8_t>(PhaseExitReason::DURATION) ? 1 : 0);
+    facts.setFloat("profilePressure", coachProfilePressure);
+    facts.setString("profileId", String(header.profileId));
+    facts.setString("roast", coachRoast);
+    facts.setInt("prevTaste", prevTaste);
+    facts.setInt("prevAdvice", prevAdvice);
+    pluginManager->trigger(facts);
+}
+
+// Taste, coach advice and dose of the most recent earlier shot on the same profile, from its notes file.
+void ShotHistoryPlugin::lookupPreviousShot(const char *profileId, uint8_t &taste, uint8_t &advice, float &doseIn) {
+    taste = 0;
+    advice = 0;
+    doseIn = 0.0f;
+    ShotIndexEntry entries[12];
+    const size_t count = readRecentEntries(entries, sizeof(entries) / sizeof(entries[0]));
+    for (size_t i = 0; i < count; i++) {
+        if (entries[i].id == static_cast<uint32_t>(currentId.toInt()))
+            continue; // the shot being persisted
+        if (strncmp(entries[i].profileId, profileId, sizeof(entries[i].profileId)) != 0)
+            continue;
+        JsonDocument notes;
+        loadNotes(padId(String(entries[i].id)), notes);
+        if (notes.isNull())
+            return;
+        const String tasteLabel = notes["balanceTaste"] | "";
+        if (tasteLabel == "sour")
+            taste = static_cast<uint8_t>(shotcoach::Taste::SOUR);
+        else if (tasteLabel == "balanced")
+            taste = static_cast<uint8_t>(shotcoach::Taste::BALANCED);
+        else if (tasteLabel == "bitter")
+            taste = static_cast<uint8_t>(shotcoach::Taste::BITTER);
+        advice = notes["coach"]["change"] | 0;
+        if (notes["doseIn"].is<float>())
+            doseIn = notes["doseIn"].as<float>();
+        else if (notes["doseIn"].is<const char *>())
+            doseIn = String(notes["doseIn"].as<const char *>()).toFloat();
+        return;
+    }
+}
+
+// Store the taste chosen on the display plus the advice shown, so the web UI shot card shows both.
+void ShotHistoryPlugin::saveFeedback(Event const &event) {
+    const String id = event.getString("id");
+    if (id.isEmpty())
+        return;
+    JsonDocument notes;
+    loadNotes(id, notes);
+    if (notes.isNull())
+        notes["id"] = id;
+    notes["balanceTaste"] = event.getString("taste");
+    notes["coach"]["change"] = event.getInt("change");
+    notes["coach"]["headline"] = event.getString("headline");
+    notes["coach"]["reason"] = event.getString("reason");
+    notes["timestamp"] = static_cast<uint32_t>(getTime());
+    saveNotes(id, notes);
 }
 
 void ShotHistoryPlugin::startRecording() {
@@ -310,6 +424,17 @@ void ShotHistoryPlugin::startRecording() {
             shotStartedVolumetric = brewProcess->target == ProcessTarget::VOLUMETRIC;
             // Capture the brew delay the shot runs with (fixed at process construction)
             currentBrewDelay = brewProcess->brewDelay;
+            // Shot Coach: the volumetric target the shot was started with (0 for time based shots) and the
+            // highest pressure the profile asks for (0 when every phase is flow controlled or simple pump)
+            coachTargetWeight = 0.0f;
+            coachProfilePressure = 0.0f;
+            for (const auto &phase : brewProcess->profile.phases) {
+                if (shotStartedVolumetric && phase.hasVolumetricTarget())
+                    coachTargetWeight = phase.getVolumetricTarget().value;
+                if (!phase.pumpIsSimple && phase.pumpAdvanced.target == PumpTarget::PUMP_TARGET_PRESSURE &&
+                    phase.pumpAdvanced.pressure > coachProfilePressure)
+                    coachProfilePressure = phase.pumpAdvanced.pressure;
+            }
         }
     }
     currentId = padId(String(controller->getSettings().getHistoryIndex()));
@@ -331,6 +456,13 @@ void ShotHistoryPlugin::startRecording() {
     maxPressureScaled = 0;
     flowSumScaled = 0;
     positiveFlowCount = 0;
+    firstDripMs = 0;
+    channelingEvents = 0;
+    lastChannelingMs = 0;
+    recentPos = 0;
+    recentCount = 0;
+    targetTempScaled = encodeUnsigned(controller->getTargetTemp(), TEMP_SCALE, TEMP_MAX_VALUE);
+    coachRoast = controller->getProfileManager()->getSelectedProfile().roast;
 
     // Reset phase tracking for new shot
     lastRecordedPhase = 0xFF;                                      // Invalid value to detect first phase
