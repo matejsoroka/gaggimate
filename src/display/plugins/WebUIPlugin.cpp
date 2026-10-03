@@ -388,6 +388,8 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
                 settings->setTimezone(request->arg("timezone"));
             if (request->hasArg("clock24hFormat"))
                 settings->setClockFormat(parseBoolArg(request->arg("clock24hFormat")));
+            if (request->hasArg("hideInfoButton"))
+                settings->setHideInfoButton(parseBoolArg(request->arg("hideInfoButton")));
             if (request->hasArg("standbyTimeout"))
                 settings->setStandbyTimeout(request->arg("standbyTimeout").toInt() * 1000);
             if (request->hasArg("mainBrightness"))
@@ -529,6 +531,7 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
     doc["delayAdjust"] = settings.isDelayAdjust();
     doc["timezone"] = settings.getTimezone();
     doc["clock24hFormat"] = settings.isClock24hFormat();
+    doc["hideInfoButton"] = settings.isHideInfoButton();
     doc["standbyTimeout"] = settings.getStandbyTimeout() / 1000;
     doc["mainBrightness"] = settings.getMainBrightness();
     doc["standbyBrightness"] = settings.getStandbyBrightness();

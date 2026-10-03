@@ -487,6 +487,12 @@ export function GeneralTab({
             checked={!!formData.clock24hFormat}
             onChange={onChange('clock24hFormat')}
           />
+          <ToggleField
+            label='Hide info button (QR code) on main menu'
+            htmlFor='hideInfoButton'
+            checked={!!formData.hideInfoButton}
+            onChange={onChange('hideInfoButton')}
+          />
         </div>
       </Section>
 
