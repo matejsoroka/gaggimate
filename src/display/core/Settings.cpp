@@ -149,6 +149,14 @@ void Settings::setSmartGrindIp(String smart_grind_ip) { smartGrindIp.set(smart_g
 
 void Settings::setSmartGrindMode(int smart_grind_mode) { smartGrindMode.set(smart_grind_mode); }
 
+void Settings::setWeatherActive(bool weather_active) { weatherActive.set(weather_active); }
+
+void Settings::setWeatherApiKey(const String &weather_api_key) { weatherApiKey.set(weather_api_key); }
+
+void Settings::setWeatherLocation(const String &weather_location) { weatherLocation.set(weather_location); }
+
+void Settings::setWeatherUnits(int weather_units) { weatherUnits.set(weather_units); }
+
 void Settings::setHomeAssistant(const bool homeAssistant) { this->homeAssistant.set(homeAssistant); }
 
 void Settings::setHomeAssistantIP(const String &homeAssistantIP) { this->homeAssistantIP.set(homeAssistantIP); }

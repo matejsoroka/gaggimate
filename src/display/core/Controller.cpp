@@ -27,6 +27,7 @@
 #include <display/plugins/ImprovPlugin.h>
 #include <display/plugins/MQTTPlugin.h>
 #include <display/plugins/NetworkWatchdogPlugin.h>
+#include <display/plugins/WeatherPlugin.h>
 #include <display/plugins/WifiStaWatchdogPlugin.h>
 #include <display/plugins/mDNSPlugin.h>
 #endif
@@ -89,6 +90,11 @@ void Controller::setup() {
     if (settings.isSmartGrindActive()) {
         pluginManager->registerPlugin(new SmartGrindPlugin());
     }
+#ifndef GAGGIMATE_SIM // weather needs Wi-Fi/TLS, device-only
+    if (settings.isWeatherActive()) {
+        pluginManager->registerPlugin(new WeatherPlugin());
+    }
+#endif
 #ifndef GAGGIMATE_SIM // MQTT/HomeAssistant is device-only
     if (settings.isHomeAssistant()) {
         pluginManager->registerPlugin(new MQTTPlugin());

@@ -155,6 +155,21 @@ void DefaultUI::init() {
         rerender = true;
         apActive = event.getInt("AP");
     });
+    pluginManager->on("weather:update", [this](Event const &event) {
+        String text;
+        if (event.getInt("valid")) {
+            String desc = event.getString("desc");
+            if (!desc.isEmpty())
+                desc.setCharAt(0, toupper(desc[0]));
+            text =
+                String(static_cast<long>(lroundf(event.getFloat("temp")))) + "\xC2\xB0" + event.getString("unit") + "  " + desc;
+        }
+        {
+            std::lock_guard<std::mutex> guard(weatherMutex);
+            weatherText = text;
+        }
+        rerender = true;
+    });
     pluginManager->on("ota:update:start", [this](Event const &) {
         rerender = true;
         changeScreen(SCREEN_ID_STANDBY_SCREEN);
@@ -263,6 +278,7 @@ void DefaultUI::loop() {
         effect_mgr.evaluate_all();
 
         if (currentScreen == SCREEN_ID_STANDBY_SCREEN) {
+            updateWeatherLabel();
             if (standbyEnterTime > 0) {
                 const Settings &settings = controller->getSettings();
                 const unsigned long now = millis();
@@ -642,6 +658,50 @@ void DefaultUI::updateBoiler() {
     boiler.target_pressure(controller->getTargetPressure());
     boiler.max_temperature(160.0f);
     boiler.max_pressure(settings.getPressureScaling());
+}
+
+// Draws the weather text below the clock on the standby screen. Runs on the UI task only. The label is created at
+// runtime (not in the EEZ export) so it survives re-exports and is recreated whenever the standby screen is.
+void DefaultUI::updateWeatherLabel() {
+    if (objects.standby_screen == nullptr)
+        return;
+
+    String text;
+    {
+        std::lock_guard<std::mutex> guard(weatherMutex);
+        text = weatherText;
+    }
+
+    const bool stale = weatherLabel == nullptr || weatherLabelParent != objects.standby_screen || !lv_obj_is_valid(weatherLabel);
+    if (stale) {
+        if (text.isEmpty())
+            return; // nothing to show, create the label lazily
+        weatherLabel = lv_label_create(objects.standby_screen);
+        weatherLabelParent = objects.standby_screen;
+        weatherThemeIdx = -1;
+        lv_obj_set_width(weatherLabel, 360);
+        lv_label_set_long_mode(weatherLabel, LV_LABEL_LONG_DOT);
+        lv_obj_set_style_text_font(weatherLabel, &lv_font_montserrat_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(weatherLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_align(weatherLabel, LV_ALIGN_CENTER, 0, -105);   // the clock sits at y = -150
+        lv_obj_clear_flag(weatherLabel, LV_OBJ_FLAG_CLICKABLE); // taps still fall through and wake the machine
+        lv_label_set_text(weatherLabel, "");
+    }
+
+    const int themeIdx = static_cast<int>(eez_flow_get_selected_theme_index());
+    if (themeIdx != weatherThemeIdx) {
+        weatherThemeIdx = themeIdx;
+        lv_obj_set_style_text_color(weatherLabel, lv_color_hex(theme_colors[themeIdx][0]), LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_opa(weatherLabel, LV_OPA_80, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+
+    if (text.isEmpty()) {
+        lv_obj_add_flag(weatherLabel, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    if (stringChanged(lv_label_get_text(weatherLabel), text.c_str()))
+        lv_label_set_text(weatherLabel, text.c_str());
+    lv_obj_clear_flag(weatherLabel, LV_OBJ_FLAG_HIDDEN);
 }
 
 // Mirror the live BrewProcess into brew_process_info; every field must stay valid/typed or the StatusScreen flow aborts.

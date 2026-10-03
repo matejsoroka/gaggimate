@@ -103,6 +103,10 @@ class Settings {
     bool isSmartGrindActive() const { return smartGrindActive.get(); }
     int getSmartGrindMode() const { return smartGrindMode.get(); }
     String getSmartGrindIp() const { return smartGrindIp.get(); }
+    bool isWeatherActive() const { return weatherActive.get(); }
+    String getWeatherApiKey() const { return weatherApiKey.get(); }
+    String getWeatherLocation() const { return weatherLocation.get(); }
+    int getWeatherUnits() const { return weatherUnits.get(); }
     bool isHomeAssistant() const { return homeAssistant.get(); }
     String getHomeAssistantIP() const { return homeAssistantIP.get(); }
     String getHomeAssistantUser() const { return homeAssistantUser.get(); }
@@ -198,6 +202,10 @@ class Settings {
     void setSmartGrindActive(bool smart_grind_active);
     void setSmartGrindIp(String smart_grind_ip);
     void setSmartGrindMode(int smart_grind_mode);
+    void setWeatherActive(bool weather_active);
+    void setWeatherApiKey(const String &weather_api_key);
+    void setWeatherLocation(const String &weather_location);
+    void setWeatherUnits(int weather_units);
     void setHomeAssistant(bool homeAssistant);
     void setHomeAssistantUser(const String &homeAssistantUser);
     void setHomeAssistantPassword(const String &homeAssistantPassword);
@@ -289,6 +297,10 @@ class Settings {
     Property<bool> smartGrindToggle{registry, "sg_t", false}; // legacy, seeds the smartGrindMode default
     Property<int> smartGrindMode{registry, "sg_m", 0};
     Property<String> smartGrindIp{registry, "sg_i", ""};
+    Property<bool> weatherActive{registry, "wx_a", false};
+    Property<String> weatherApiKey{registry, "wx_k", ""};
+    Property<String> weatherLocation{registry, "wx_l", ""};
+    Property<int> weatherUnits{registry, "wx_u", 0}; // 0 = metric (°C), 1 = imperial (°F)
     Property<bool> homeAssistant{registry, "ha_a", false};
     Property<String> homeAssistantUser{registry, "ha_u", ""};
     Property<String> homeAssistantPassword{registry, "ha_pw", ""};

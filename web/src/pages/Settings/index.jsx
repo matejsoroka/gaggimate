@@ -61,6 +61,7 @@ const CHECKBOX_KEYS = [
   'homekit',
   'boilerFillActive',
   'smartGrindActive',
+  'weatherActive',
   'homeAssistant',
   'momentaryButtons',
   'delayAdjust',
