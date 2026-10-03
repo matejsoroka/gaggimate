@@ -168,6 +168,7 @@ struct Profile {
     String description;
     bool utility = false;
     float temperature;
+    String roast; // "light" | "medium" | "dark" | "" (unknown); steers the Shot Coach thresholds
     bool favorite = false;
     bool selected = false;
     std::vector<Phase> phases;
@@ -279,6 +280,7 @@ inline bool parseProfile(const JsonObject &obj, Profile &profile) {
     profile.favorite = obj["favorite"] | false;
     profile.selected = obj["selected"] | false;
     profile.utility = obj["utility"] | false;
+    profile.roast = obj["roast"].is<const char *>() ? obj["roast"].as<String>() : String("");
 
     auto phasesArray = obj["phases"].as<JsonArray>();
     for (JsonObject p : phasesArray) {
@@ -386,6 +388,7 @@ inline void writeProfile(JsonObject &obj, const Profile &profile) {
     obj["favorite"] = profile.favorite;
     obj["selected"] = profile.selected;
     obj["utility"] = profile.utility;
+    obj["roast"] = profile.roast;
 
     auto phasesArray = obj["phases"].to<JsonArray>();
     for (const Phase &phase : profile.phases) {

@@ -94,6 +94,7 @@ class Settings {
     String getWifiApPassword() const { return wifiApPassword.get(); }
     String getMdnsName() const { return mdnsName.get(); }
     bool isHomekit() const { return homekit.get(); }
+    bool isShotCoachActive() const { return shotCoachActive.get(); }
     bool isVolumetricTarget() const { return volumetricTarget.get(); }
     String getOTAChannel() const { return otaChannel.get(); }
     String getSavedScale() const { return savedScale.get(); }
@@ -194,6 +195,7 @@ class Settings {
     void setWifiApPassword(const String &wifiApPassword);
     void setMdnsName(const String &mdnsName);
     void setHomekit(bool homekit);
+    void setShotCoachActive(bool shot_coach_active);
     void setVolumetricTarget(bool volumetric_target);
     void setOTAChannel(const String &otaChannel);
     void setSavedScale(const String &savedScale);
@@ -291,6 +293,7 @@ class Settings {
     Property<String> mdnsName{registry, "mn", DEFAULT_MDNS_NAME};
     Property<String> savedScale{registry, "ssc", ""};
     Property<bool> homekit{registry, "hk", false};
+    Property<bool> shotCoachActive{registry, "sc_a", true}; // ask for taste feedback after a shot
     Property<bool> volumetricTarget{registry, "vt", false};
     Property<bool> boilerFillActive{registry, "bf_a", false};
     Property<int> startupFillTime{registry, "bf_su", 5000};

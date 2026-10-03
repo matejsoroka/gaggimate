@@ -5,6 +5,20 @@ import { Spinner } from '../../components/Spinner.jsx';
 import { faEdit } from '@fortawesome/free-solid-svg-icons/faEdit';
 import { faSave } from '@fortawesome/free-solid-svg-icons/faSave';
 
+// Why each Shot Coach suggestion helps, keyed by shotcoach::Change (src/display/core/ShotCoach.h).
+const COACH_EXPLANATIONS = {
+  1: 'The shot is in a good place. Change nothing and see whether the next one repeats it.',
+  2: 'A finer grind slows the water down and exposes more surface, so more sweetness and body dissolve before the shot ends. Sourness and a fast shot mean the water left too early.',
+  3: 'A coarser grind lets water through faster and extracts less, which trims the bitter, drying compounds that come out late in a slow shot.',
+  4: 'A bigger dose adds resistance without changing the grind. Useful when grind steps are too coarse to fine-tune, or the last grind change overshot.',
+  5: 'A smaller dose lowers resistance and gives the water an easier, more even path, a gentler alternative to grinding finer again.',
+  6: 'Stopping later pushes the ratio up: more water passes the puck, extraction rises and sour, under-developed shots sweeten up.',
+  7: 'Stopping earlier keeps the ratio short so the bitter, late-shot compounds stay in the puck.',
+  8: 'Hotter water dissolves more, especially from dense light roasts, which lifts a sour, thin cup toward sweetness.',
+  9: 'Cooler water extracts less of the harsh, roasty compounds that dark roasts give up easily.',
+  10: 'A pressure drop with a flow spike means water found a crack and bypassed the coffee. Distribute and tamp more evenly before touching the grinder.',
+};
+
 export default function ShotNotesCard({ shot, onNotesUpdate, onNotesLoaded }) {
   const apiService = useContext(ApiServiceContext);
 
@@ -339,6 +353,17 @@ export default function ShotNotesCard({ shot, onNotesUpdate, onNotesLoaded }) {
               className={`input input-bordered bg-base-200 w-full cursor-default capitalize ${getTasteColor(notes.balanceTaste)}`}
             >
               {notes.balanceTaste}
+            </div>
+          )}
+          {notes.coach?.headline && (
+            <div className='mt-1 text-xs opacity-70'>
+              <div>
+                Coach: {notes.coach.headline}
+                {notes.coach.reason ? ` — ${notes.coach.reason}` : ''}
+              </div>
+              {COACH_EXPLANATIONS[notes.coach.change] && (
+                <div className='mt-1 italic'>{COACH_EXPLANATIONS[notes.coach.change]}</div>
+              )}
             </div>
           )}
         </div>

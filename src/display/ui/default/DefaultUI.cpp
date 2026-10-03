@@ -119,6 +119,50 @@ void DefaultUI::init() {
         if (eez_flow_get_current_screen() == SCREEN_ID_STATUS_SCREEN) {
             changeScreen(SCREEN_ID_BREW_SCREEN);
         }
+        std::lock_guard<std::mutex> guard(coachMutex);
+        coachOffer = false;
+        coachArmed = false;
+    });
+    // Shot Coach: arm on brew end; the taste buttons appear once the history plugin publishes the shot facts
+    // (right after the entry is written, up to ~3 s later while the scale settles). Flushes and utility
+    // profiles never publish facts, so they never get the buttons.
+    pluginManager->on("controller:brew:end", [this](Event const &) {
+        std::lock_guard<std::mutex> guard(coachMutex);
+        coachArmed = true;
+        coachOffer = false;
+        coachFactsValid = false;
+        coachHasAdvice = false;
+        coachTaste = shotcoach::Taste::UNKNOWN;
+        coachShotId = "";
+    });
+    pluginManager->on("shot:facts", [this](Event const &event) {
+        {
+            std::lock_guard<std::mutex> guard(coachMutex);
+            if (!coachArmed)
+                return; // the shot was already cleared from the screen
+            coachShotId = event.getString("id");
+            coachFacts = shotcoach::Facts{};
+            coachFacts.aborted = event.getInt("aborted") != 0;
+            coachFacts.durationMs = static_cast<uint32_t>(event.getInt("durationMs"));
+            coachFacts.firstDripMs = static_cast<uint32_t>(event.getInt("firstDripMs"));
+            coachFacts.finalWeight = event.getFloat("finalWeight");
+            coachFacts.targetWeight = event.getFloat("targetWeight");
+            coachFacts.doseIn = event.getFloat("doseIn");
+            coachFacts.maxPressure = event.getFloat("maxPressure");
+            coachFacts.avgFlow = event.getFloat("avgFlow");
+            coachFacts.avgTemp = event.getFloat("avgTemp");
+            coachFacts.targetTemp = event.getFloat("targetTemp");
+            coachFacts.channelingEvents = static_cast<uint16_t>(event.getInt("channelingEvents"));
+            coachFacts.hitTimeCap = event.getInt("hitTimeCap") != 0;
+            coachFacts.profilePressure = event.getFloat("profilePressure");
+            coachFacts.roast = shotcoach::roastFromLabel(event.getString("roast").c_str());
+            coachFacts.prevTaste = static_cast<shotcoach::Taste>(event.getInt("prevTaste"));
+            coachFacts.prevAdvice = static_cast<shotcoach::Change>(event.getInt("prevAdvice"));
+            coachFactsValid = true;
+            // Nothing to learn from an aborted or too-short shot
+            coachOffer = !coachFacts.aborted && controller->getSettings().isShotCoachActive();
+        }
+        rerender = true;
     });
     pluginManager->on("controller:bluetooth:waiting", [this](Event const &) {
         waitingForController = true;
@@ -279,6 +323,9 @@ void DefaultUI::loop() {
         currentScreen = static_cast<ScreensEnum>(eez_flow_get_current_screen());
         effect_mgr.evaluate_all();
 
+        if (currentScreen == SCREEN_ID_STATUS_SCREEN) {
+            updateShotCoachPanel();
+        }
         if (currentScreen == SCREEN_ID_STANDBY_SCREEN) {
             updateWeatherLabel();
             if (standbyEnterTime > 0) {
@@ -860,4 +907,138 @@ void DefaultUI::profileLoopTask(void *arg) {
         ui->loopProfiles();
         vTaskDelay(25 / portTICK_PERIOD_MS);
     }
+}
+
+// ---- Shot Coach -----------------------------------------------------------------------------------------------------
+
+void DefaultUI::computeShotCoachAdvice() {
+    coachAdvice = shotcoach::advise(coachFacts, coachTaste);
+    coachHasAdvice = true;
+    Event feedback;
+    feedback.id = "shot:feedback";
+    feedback.setString("id", coachShotId);
+    feedback.setString("taste", shotcoach::tasteLabel(coachTaste));
+    feedback.setInt("change", static_cast<int>(coachAdvice.change));
+    feedback.setString("headline", coachAdvice.headline);
+    feedback.setString("reason", coachAdvice.reason);
+    pluginManager->trigger(feedback);
+}
+
+void DefaultUI::onShotCoachTaste(shotcoach::Taste taste) {
+    {
+        std::lock_guard<std::mutex> guard(coachMutex);
+        if (!coachOffer || coachHasAdvice)
+            return;
+        coachTaste = taste;
+        if (coachFactsValid)
+            computeShotCoachAdvice();
+    }
+    rerender = true;
+}
+
+void DefaultUI::shotCoachButtonCb(lv_event_t *e) {
+    auto *ui = static_cast<DefaultUI *>(lv_event_get_user_data(e));
+    lv_obj_t *btn = lv_event_get_target(e);
+    if (ui == nullptr || btn == nullptr)
+        return;
+    for (int i = 0; i < 3; i++) {
+        if (ui->coachButtons[i] == btn) {
+            ui->onShotCoachTaste(static_cast<shotcoach::Taste>(i + 1)); // 1 = sour, 2 = balanced, 3 = bitter
+            return;
+        }
+    }
+}
+
+// Taste row below the check button on the status screen, replaced by the advice once a taste is tapped.
+// Runs on the UI task only. Created at runtime so the EEZ export stays untouched.
+void DefaultUI::updateShotCoachPanel() {
+    if (objects.status_screen == nullptr)
+        return;
+
+    bool offer, hasAdvice;
+    shotcoach::Taste taste;
+    shotcoach::Advice advice;
+    {
+        std::lock_guard<std::mutex> guard(coachMutex);
+        offer = coachOffer;
+        hasAdvice = coachHasAdvice;
+        taste = coachTaste;
+        advice = coachAdvice;
+    }
+
+    const bool stale = coachPanel == nullptr || coachPanelParent != objects.status_screen || !lv_obj_is_valid(coachPanel);
+    if (stale) {
+        if (!offer)
+            return;
+        coachPanel = lv_obj_create(objects.status_screen);
+        coachPanelParent = objects.status_screen;
+        coachThemeIdx = -1;
+        lv_obj_remove_style_all(coachPanel);
+        // Sits under the check button (y = 130, 40 px); the round panel is only ~135 px wide at y = 198.
+        lv_obj_set_size(coachPanel, 270, 56);
+        lv_obj_align(coachPanel, LV_ALIGN_CENTER, 0, 178);
+        lv_obj_clear_flag(coachPanel, LV_OBJ_FLAG_CLICKABLE | LV_OBJ_FLAG_SCROLLABLE);
+        static const char *labels[3] = {"Sour", "Balanced", "Bitter"};
+        for (int i = 0; i < 3; i++) {
+            lv_obj_t *btn = lv_btn_create(coachPanel);
+            coachButtons[i] = btn;
+            lv_obj_remove_style_all(btn);
+            lv_obj_set_size(btn, 84, 40);
+            lv_obj_align(btn, LV_ALIGN_LEFT_MID, 3 + i * 90, 0);
+            lv_obj_set_style_radius(btn, 20, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_20, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_bg_opa(btn, LV_OPA_50, LV_PART_MAIN | LV_STATE_PRESSED);
+            lv_obj_add_flag(btn, LV_OBJ_FLAG_CLICKABLE);
+            lv_obj_add_event_cb(btn, shotCoachButtonCb, LV_EVENT_CLICKED, this);
+            lv_obj_t *lbl = lv_label_create(btn);
+            lv_label_set_text(lbl, labels[i]);
+            lv_obj_set_style_text_font(lbl, &lv_font_montserrat_16, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_center(lbl);
+        }
+        coachLabel = lv_label_create(coachPanel);
+        lv_obj_set_width(coachLabel, 240);
+        lv_label_set_long_mode(coachLabel, LV_LABEL_LONG_WRAP);
+        lv_obj_set_style_text_font(coachLabel, &lv_font_montserrat_14, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_set_style_text_align(coachLabel, LV_TEXT_ALIGN_CENTER, LV_PART_MAIN | LV_STATE_DEFAULT);
+        lv_obj_align(coachLabel, LV_ALIGN_CENTER, 0, 0);
+        lv_obj_clear_flag(coachLabel, LV_OBJ_FLAG_CLICKABLE);
+        lv_label_set_text(coachLabel, "");
+        lv_obj_add_flag(coachLabel, LV_OBJ_FLAG_HIDDEN);
+    }
+
+    const int themeIdx = static_cast<int>(eez_flow_get_selected_theme_index());
+    if (themeIdx != coachThemeIdx) {
+        coachThemeIdx = themeIdx;
+        const lv_color_t fg = lv_color_hex(theme_colors[themeIdx][0]);
+        for (auto *btn : coachButtons) {
+            lv_obj_set_style_bg_color(btn, fg, LV_PART_MAIN | LV_STATE_DEFAULT);
+            lv_obj_set_style_text_color(btn, fg, LV_PART_MAIN | LV_STATE_DEFAULT);
+        }
+        lv_obj_set_style_text_color(coachLabel, fg, LV_PART_MAIN | LV_STATE_DEFAULT);
+    }
+
+    if (!offer) {
+        lv_obj_add_flag(coachPanel, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_obj_clear_flag(coachPanel, LV_OBJ_FLAG_HIDDEN);
+
+    const bool showButtons = taste == shotcoach::Taste::UNKNOWN;
+    for (auto *btn : coachButtons) {
+        if (showButtons)
+            lv_obj_clear_flag(btn, LV_OBJ_FLAG_HIDDEN);
+        else
+            lv_obj_add_flag(btn, LV_OBJ_FLAG_HIDDEN);
+    }
+    if (showButtons) {
+        lv_obj_add_flag(coachLabel, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+
+    String text;
+    if (hasAdvice)
+        text = String(advice.headline) + "\n" + advice.reason;
+    if (stringChanged(lv_label_get_text(coachLabel), text.c_str()))
+        lv_label_set_text(coachLabel, text.c_str());
+    lv_obj_clear_flag(coachLabel, LV_OBJ_FLAG_HIDDEN);
 }

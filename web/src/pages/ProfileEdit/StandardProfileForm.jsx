@@ -64,6 +64,7 @@ export function StandardProfileForm(props) {
           onChangeLabel={e => onFieldChange('label', e.target.value)}
           onChangeDescription={e => onFieldChange('description', e.target.value)}
           onChangeTemperature={e => onFieldChange('temperature', e.target.value)}
+          onChangeRoast={e => onFieldChange('roast', e.target.value)}
           onChangeUtility={e => onFieldChange('utility', !!e.target.checked)}
         />
 

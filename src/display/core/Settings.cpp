@@ -131,6 +131,8 @@ void Settings::setMdnsName(const String &mdnsName) { this->mdnsName.set(mdnsName
 
 void Settings::setHomekit(const bool homekit) { this->homekit.set(homekit); }
 
+void Settings::setShotCoachActive(bool shot_coach_active) { shotCoachActive.set(shot_coach_active); }
+
 void Settings::setVolumetricTarget(bool volumetric_target) { volumetricTarget.set(volumetric_target); }
 
 void Settings::setOTAChannel(const String &otaChannel) { this->otaChannel.set(otaChannel); }

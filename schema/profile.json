@@ -63,6 +63,12 @@
       "default": false,
       "description": "`true` = utility profile (e.g. backflush, flush routines). Utility profiles are excluded from brew-flow treatment at runtime (`BrewProcess::isUtility()` — `src/display/core/process/BrewProcess.h:69`). Set this on non-brew routines like backflush."
     },
+    "roast": {
+      "type": "string",
+      "enum": ["", "light", "medium", "dark"],
+      "default": "",
+      "description": "Roast level of the beans this profile is meant for; empty = not set. Only read by the Shot Coach (taste feedback on the display after a shot, `src/display/core/ShotCoach.h`) to pick roast-appropriate ranges for extraction time, brew ratio and temperature. Has no effect on how the profile runs."
+    },
     "phases": {
       "type": "array",
       "minItems": 1,

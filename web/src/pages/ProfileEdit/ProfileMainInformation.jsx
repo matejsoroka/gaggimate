@@ -55,6 +55,27 @@ export function ProfileMainInformation(props) {
         </div>
       </div>
       <div className='form-control'>
+        <label htmlFor='roast' className='mb-2 block text-sm font-medium'>
+          Roast level
+        </label>
+        <select
+          id='roast'
+          name='roast'
+          className='select select-bordered w-full'
+          value={props.data?.roast || ''}
+          onChange={props.onChangeRoast}
+          aria-label='Roast level of the beans this profile is for'
+        >
+          <option value=''>Not set</option>
+          <option value='light'>Light</option>
+          <option value='medium'>Medium</option>
+          <option value='dark'>Dark</option>
+        </select>
+        <div className='mt-1 text-xs opacity-70'>
+          Used by the Shot Coach to judge shot time, ratio and temperature for this roast.
+        </div>
+      </div>
+      <div className='form-control'>
         <label
           htmlFor='utility'
           className='mb-2 block text-sm font-medium'

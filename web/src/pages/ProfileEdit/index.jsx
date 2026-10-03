@@ -48,6 +48,7 @@ export function ProfileEdit() {
           label: 'New Profile',
           description: '',
           temperature: 93,
+          roast: '',
           phases: [
             {
               name: 'Pump',

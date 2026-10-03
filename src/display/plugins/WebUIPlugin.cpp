@@ -330,6 +330,8 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
                 settings->setWifiApPassword(request->arg("apPassword"));
             if (request->hasArg("homekit"))
                 settings->setHomekit(parseBoolArg(request->arg("homekit")));
+            if (request->hasArg("shotCoachActive"))
+                settings->setShotCoachActive(parseBoolArg(request->arg("shotCoachActive")));
             if (request->hasArg("boilerFillActive"))
                 settings->setBoilerFillActive(parseBoolArg(request->arg("boilerFillActive")));
             if (request->hasArg("startupFillTime"))
@@ -504,6 +506,7 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
     doc["wifiPassword"] = apMode ? "---unchanged---" : settings.getWifiPassword();
     doc["apPassword"] = settings.getWifiApPassword();
     doc["mdnsName"] = settings.getMdnsName();
+    doc["shotCoachActive"] = settings.isShotCoachActive();
     doc["temperatureOffset"] = String(settings.getTemperatureOffset());
     doc["pressureOffset"] = String(settings.getPressureOffset());
     doc["pressureScaling"] = String(settings.getPressureScaling());
